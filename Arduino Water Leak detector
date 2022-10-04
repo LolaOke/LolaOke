@@ -1,0 +1,221 @@
+/*
+ * This is a water leak detector monitor. 
+ * when the sensor detects a leak, a Red LED is truned on as a simulation of a valve shuting and it is also displayed on the LCD.
+ * when the time is 16:20 the Valve is tested, this when The green Led is turned on to indicate testing 
+ * when the BLue LED is on it indicates that the device is turned on.
+ * in addition, the time and an animation will be on constant display while nothing is happing. 
+ */
+
+#include <DS3231.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <UTFTGLUE.h>  
+
+char Timeprint[10];
+DS3231 rtc(SDA, SCL);
+Time t;
+UTFTGLUE myGLCD(0x9486,A3,A2,A1,A0,A4);
+
+
+int onLed = 25;       //Blue
+int alarmLed = 29;   //Red
+int testLed = 27;   //Green 
+int rainSensor = A8;  //Rain sensor 
+int  Buzzer = 41;
+
+const int sensorMin = 0; 
+const int sensorMax = 1024; 
+
+// Declare which fonts we will be using
+extern uint8_t BigFont[];
+extern uint8_t SmallFont[];
+extern uint8_t SevenSegNumFont[];
+
+
+// the code that shows what happens when a leak is detected.
+void Leak_det()
+{
+int sensorReading;
+int range;
+ sensorReading = analogRead(A8);
+ range = map(sensorReading, sensorMin, sensorMax, 0, 2);
+
+ switch (range)
+ {
+      case 0:
+        myGLCD.fillScr(255, 0, 0);
+        myGLCD.setColor(255, 255, 255) ;
+        myGLCD.setBackColor(255, 0, 0);
+        myGLCD.setFont(BigFont);
+        myGLCD.setTextSize(2); 
+        myGLCD.print("VALVE SHUT!!! LEAK DETECTED", 80, 110);
+        digitalWrite (Buzzer, HIGH); // sound the buzzer
+        Valve_sim(255, 0, 0); // Red LED 
+        Date_time();
+        
+        
+        break;
+        
+        case 1:
+        myGLCD.fillScr(255, 0, 0);
+        myGLCD.setColor(255, 255, 255) ;
+        myGLCD.setBackColor(255, 0, 0);
+        myGLCD.setFont(BigFont);
+        myGLCD.setTextSize(2);
+        myGLCD.print("VALVE SHUT!!! A LITTLE LEAK DETECTED", 80, 110);
+        Date_time();
+        Valve_sim(255, 0, 0); // Red LED
+        digitalWrite (Buzzer, HIGH); // sound the buzzer
+        
+        
+        break;
+ }
+ }
+
+
+
+// the code for the RGB Led.
+ void Valve_sim(int red_light_value, int green_light_value, int blue_light_value)
+ {
+  digitalWrite(alarmLed, red_light_value);
+  digitalWrite(testLed, green_light_value);
+  digitalWrite(onLed, blue_light_value);
+ }
+
+
+// this Code shows the animation and the frame that shows thst the device is on 
+
+void ON_screen()
+{ 
+  myGLCD.clrScr();
+  
+  myGLCD.setColor(255, 0, 0);
+  myGLCD.fillRect(0, 0, 479, 13);
+  myGLCD.setColor(64, 64, 64);
+  myGLCD.fillRect(0, 306, 479, 319);
+  myGLCD.setColor(255, 255, 255);
+  myGLCD.setBackColor(255, 0, 0);
+  
+  myGLCD.print("WATER DETECTOR & MONITOR IS NOW ACTIVE", 6, 1);
+  myGLCD.setBackColor(64, 64, 64);
+  myGLCD.setColor(255,255,0);
+  
+  myGLCD.print("CREATED BY: DAMILOLA", CENTER, 307);
+  myGLCD.setColor(0, 0, 255);
+  
+  myGLCD.drawRect(0, 14, 479, 305);
+  Valve_sim( 0, 0, 255); // Blue
+//Animation 
+
+  for (int i=0; i<10000; i++)
+  {
+    myGLCD.setColor(random(255), random(255), random(255));
+    myGLCD.drawPixel(2+random(476), 16+random(289));
+  }
+     delay(5000);
+  Date_time();
+  
+}
+
+// this the code for testing, so if the time is 10:00 or 22:00, the valve should close and open. 
+void Const_Testing()
+{
+t = rtc.getTime();
+int H = t.hour;
+int M = t.min;
+ if (H == 16 && M == 20 )
+ {
+  myGLCD.fillScr(255, 255, 0); 
+  myGLCD.setBackColor(255, 255, 0);
+  myGLCD.setFont(SevenSegNumFont);
+  myGLCD.setTextSize(3);
+  myGLCD.print("TESTING!!!!!", 80 , 93);
+  Valve_sim(0, 255, 0); // GREEN
+  Date_time();
+  delay(60000);
+  ON_screen();   
+  }
+
+}
+
+
+//Display Time & Date
+void Date_time()
+{
+
+   // t = rtc.getTime();
+   myGLCD.setColor(0,255, 0);
+   myGLCD.setTextSize(2);
+   
+   String(t.date, DEC).toCharArray(Timeprint, 13);
+   myGLCD.print(Timeprint, 100, 40);
+
+   
+   myGLCD.print("-", 121, 40);
+ 
+ 
+   String(t.mon, DEC).toCharArray(Timeprint, 13);
+   myGLCD.print(Timeprint, 140, 40);
+ 
+   
+   myGLCD.print("-", 150, 40);
+
+
+   String(t.year, DEC).toCharArray(Timeprint, 13);
+   myGLCD.print(Timeprint, 169, 40);
+   
+;
+   String(t.hour, DEC).toCharArray(Timeprint, 13);
+   myGLCD.print(Timeprint, 121, 70);
+  
+
+   myGLCD.print(":", 150, 70);
+
+
+   String(t.min, DEC).toCharArray(Timeprint, 13);
+   myGLCD.print(Timeprint, 170, 70);
+  
+   // Refresh every 60 seconds the LCD screen and his values.
+  delay (60000);
+}
+
+
+ void setup()
+  {
+  pinMode(A0, OUTPUT);       //.kbv mcufriend have RD on A0
+  
+ // LED pins
+  pinMode (onLed, OUTPUT);
+  pinMode (alarmLed, OUTPUT);
+  pinMode (testLed, OUTPUT);
+  
+  pinMode (Buzzer, OUTPUT); // set pin to output mode
+  digitalWrite(A0, HIGH);
+  
+  rtc.begin();
+ // rtc.setDOW(TUESDAY);
+ // rtc.setTime(10, 00 , 00);
+ // rtc.setDate(21, 04, 2020);
+  
+  Wire.begin();
+
+
+// Setup the LCD
+  myGLCD.InitLCD();
+  myGLCD.setFont(BigFont);
+  myGLCD.setTextSize(2);
+ 
+ ON_screen();
+  }
+
+
+
+  void loop()
+  {
+   Date_time();
+   
+  Leak_det();
+   
+  Const_Testing();
+ 
+  }
